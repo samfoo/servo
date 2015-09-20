@@ -14,7 +14,7 @@ use dom::bindings::js::{JS, Root};
 use dom::bindings::refcounted::Trusted;
 use dom::bindings::trace::JSTraceable;
 use dom::bindings::utils::{Reflector, reflect_dom_object};
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::node::{window_from_node, Node};
 use dom::text::Text;
 use dom::window::Window;

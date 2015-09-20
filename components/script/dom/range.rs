@@ -17,7 +17,7 @@ use dom::bindings::global::GlobalRef;
 use dom::bindings::js::{JS, Root, RootedReference};
 use dom::bindings::utils::{Reflector, reflect_dom_object};
 use dom::characterdata::CharacterDataTypeId;
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::documentfragment::DocumentFragment;
 use dom::node::{Node, NodeTypeId};
 use std::cell::RefCell;

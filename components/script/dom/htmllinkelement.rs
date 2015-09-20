@@ -14,7 +14,7 @@ use dom::bindings::global::GlobalRef;
 use dom::bindings::js::{JS, MutNullableHeap, Root};
 use dom::bindings::js::{RootedReference};
 use dom::bindings::refcounted::Trusted;
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::domtokenlist::DOMTokenList;
 use dom::element::{AttributeMutation, Element, ElementTypeId};
 use dom::event::{EventBubbles, EventCancelable, Event};

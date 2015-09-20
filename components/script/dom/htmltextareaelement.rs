@@ -14,7 +14,7 @@ use dom::bindings::codegen::InheritTypes::{HTMLTextAreaElementDerived, HTMLField
 use dom::bindings::global::GlobalRef;
 use dom::bindings::js::{LayoutJS, Root};
 use dom::bindings::refcounted::Trusted;
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::element::{AttributeMutation, Element, ElementTypeId};
 use dom::event::{Event, EventBubbles, EventCancelable};
 use dom::eventtarget::{EventTarget, EventTargetTypeId};

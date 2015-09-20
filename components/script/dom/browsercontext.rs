@@ -8,7 +8,7 @@ use dom::bindings::js::{JS, Root};
 use dom::bindings::proxyhandler::{get_property_descriptor, fill_property_descriptor};
 use dom::bindings::utils::get_array_index_from_id;
 use dom::bindings::utils::{Reflectable, WindowProxyHandler};
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::element::Element;
 use dom::window::Window;
 use js::glue::{GetProxyPrivate};

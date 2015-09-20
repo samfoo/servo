@@ -23,7 +23,7 @@ use dom::browsercontext::BrowsingContext;
 use dom::console::Console;
 use dom::crypto::Crypto;
 use dom::cssstyledeclaration::{CSSModificationAccess, CSSStyleDeclaration};
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::element::Element;
 use dom::eventtarget::{EventTarget, EventTargetTypeId};
 use dom::location::Location;

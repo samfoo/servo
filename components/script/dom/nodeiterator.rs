@@ -12,7 +12,7 @@ use dom::bindings::error::Fallible;
 use dom::bindings::global::GlobalRef;
 use dom::bindings::js::{JS, MutHeap, Root};
 use dom::bindings::utils::{Reflector, reflect_dom_object};
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::node::Node;
 use std::cell::Cell;
 use std::rc::Rc;

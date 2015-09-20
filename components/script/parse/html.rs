@@ -16,7 +16,7 @@ use dom::bindings::js::{JS, Root};
 use dom::bindings::js::{RootedReference};
 use dom::characterdata::CharacterDataTypeId;
 use dom::comment::Comment;
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::document::{DocumentSource, IsHTMLDocument};
 use dom::documenttype::DocumentType;
 use dom::element::{Element, ElementCreator};

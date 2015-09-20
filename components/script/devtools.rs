@@ -14,6 +14,7 @@ use dom::bindings::conversions::jsstring_to_str;
 use dom::bindings::global::GlobalRef;
 use dom::bindings::js::Root;
 use dom::node::Node;
+use dom::document::DocumentElement;
 use ipc_channel::ipc::IpcSender;
 use js::jsapi::{ObjectClassName, RootedObject, RootedValue};
 use js::jsval::UndefinedValue;

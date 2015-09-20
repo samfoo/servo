@@ -13,7 +13,7 @@ use dom::bindings::global::GlobalRef;
 use dom::bindings::js::Root;
 use dom::bindings::js::{JS, MutHeap};
 use dom::bindings::utils::{Reflector, reflect_dom_object};
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::node::Node;
 use std::rc::Rc;
 

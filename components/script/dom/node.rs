@@ -35,7 +35,7 @@ use dom::bindings::trace::RootedVec;
 use dom::bindings::utils::{namespace_from_domstring, Reflectable, reflect_dom_object};
 use dom::characterdata::{CharacterData, CharacterDataTypeId};
 use dom::comment::Comment;
-use dom::document::{Document, IsHTMLDocument, DocumentSource};
+use dom::document::{Document, DocumentElement, IsHTMLDocument, DocumentSource};
 use dom::documentfragment::DocumentFragment;
 use dom::documenttype::DocumentType;
 use dom::element::{Element, ElementCreator, ElementTypeId};

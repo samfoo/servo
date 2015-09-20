@@ -18,7 +18,7 @@ use dom::bindings::codegen::InheritTypes::HTMLInputElementCast;
 use dom::bindings::codegen::InheritTypes::{HTMLTextAreaElementCast, NodeCast};
 use dom::bindings::global::GlobalRef;
 use dom::bindings::js::{Root};
-use dom::document::Document;
+use dom::document::{Document, DocumentElement};
 use dom::element::{Element, ElementTypeId};
 use dom::event::{Event, EventBubbles, EventCancelable};
 use dom::eventtarget::{EventTarget, EventTargetTypeId};

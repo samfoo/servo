@@ -34,7 +34,7 @@ use dom::bindings::js::{RootCollectionPtr, Root, RootedReference};
 use dom::bindings::refcounted::{LiveDOMReferences, Trusted, TrustedReference, trace_refcounted_objects};
 use dom::bindings::trace::{JSTraceable, trace_traceables, RootedVec};
 use dom::bindings::utils::{WRAP_CALLBACKS, DOM_CALLBACKS};
-use dom::document::{Document, IsHTMLDocument, DocumentProgressHandler};
+use dom::document::{Document, DocumentElement, IsHTMLDocument, DocumentProgressHandler};
 use dom::document::{DocumentProgressTask, DocumentSource, MouseEventType};
 use dom::element::Element;
 use dom::event::{EventBubbles, EventCancelable};
