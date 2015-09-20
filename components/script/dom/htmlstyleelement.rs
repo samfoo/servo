@@ -13,6 +13,7 @@ use dom::eventtarget::{EventTarget, EventTargetTypeId};
 use dom::htmlelement::{HTMLElement, HTMLElementTypeId};
 use dom::node::window_from_node;
 use dom::node::{ChildrenMutation, Node, NodeTypeId};
+use dom::window::WindowElement;
 use dom::virtualmethods::VirtualMethods;
 use layout_interface::{LayoutChan, Msg};
 use style::media_queries::parse_media_query_list;

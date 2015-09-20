@@ -14,7 +14,7 @@ use dom::bindings::js::{JS, Root};
 use dom::bindings::utils::{Reflector, reflect_dom_object};
 use dom::document::DocumentSource;
 use dom::document::{Document, DocumentElement, IsHTMLDocument};
-use dom::window::Window;
+use dom::window::{Window, WindowElement};
 use parse::html::{ParseContext, parse_html};
 use std::borrow::ToOwned;
 use util::str::DOMString;

@@ -42,6 +42,7 @@ use dom::node::{Node, NodeDamage, window_from_node};
 use dom::servohtmlparser::{ServoHTMLParser, ParserContext};
 use dom::uievent::UIEvent;
 use dom::window::{Window, ScriptHelpers, ReflowReason};
+use dom::window::WindowElement;
 use dom::worker::TrustedWorkerAddress;
 use euclid::Rect;
 use euclid::point::Point2D;

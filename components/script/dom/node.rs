@@ -46,6 +46,7 @@ use dom::processinginstruction::ProcessingInstruction;
 use dom::text::Text;
 use dom::virtualmethods::{VirtualMethods, vtable_for};
 use dom::window::Window;
+use dom::window::WindowElement;
 use euclid::rect::Rect;
 use js::jsapi::{JSContext, JSObject, JSRuntime};
 use layout_interface::{LayoutChan, Msg};

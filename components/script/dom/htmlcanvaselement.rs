@@ -15,6 +15,7 @@ use dom::bindings::js::{JS, LayoutJS, MutNullableHeap, HeapGCValue, Root};
 use dom::bindings::utils::{Reflectable};
 use dom::canvasrenderingcontext2d::{CanvasRenderingContext2D, LayoutCanvasRenderingContext2DHelpers};
 use dom::document::Document;
+use dom::window::WindowElement;
 use dom::element::{AttributeMutation, ElementTypeId};
 use dom::eventtarget::{EventTarget, EventTargetTypeId};
 use dom::htmlelement::{HTMLElement, HTMLElementTypeId};
@@ -293,6 +294,7 @@ impl<'a> From<&'a WebGLContextAttributes> for GLContextAttributes {
 
 pub mod utils {
     use dom::window::Window;
+    use dom::window::WindowElement;
     use ipc_channel::ipc;
     use net_traits::image_cache_task::{ImageCacheChan, ImageResponse};
     use url::Url;

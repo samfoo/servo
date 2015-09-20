@@ -26,6 +26,7 @@ use dom::keyboardevent::KeyboardEvent;
 use dom::node::{Node, NodeDamage, NodeTypeId};
 use dom::node::{document_from_node, window_from_node};
 use dom::virtualmethods::VirtualMethods;
+use dom::window::WindowElement;
 use msg::constellation_msg::ConstellationChan;
 use std::borrow::ToOwned;
 use std::cell::Cell;

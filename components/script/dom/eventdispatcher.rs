@@ -13,7 +13,7 @@ use dom::event::{Event, EventPhase};
 use dom::eventtarget::{EventTarget, ListenerPhase, EventListenerType};
 use dom::node::Node;
 use dom::virtualmethods::vtable_for;
-use dom::window::Window;
+use dom::window::{Window, WindowElement};
 
 struct AutoDOMEventMarker {
     window: Root<Window>,

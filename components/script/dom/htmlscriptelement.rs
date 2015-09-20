@@ -27,6 +27,7 @@ use dom::node::{ChildrenMutation, CloneChildrenFlag, Node};
 use dom::node::{NodeTypeId, document_from_node, window_from_node};
 use dom::virtualmethods::VirtualMethods;
 use dom::window::ScriptHelpers;
+use dom::window::WindowElement;
 use encoding::all::UTF_8;
 use encoding::label::encoding_from_whatwg_label;
 use encoding::types::{Encoding, EncodingRef, DecoderTrap};

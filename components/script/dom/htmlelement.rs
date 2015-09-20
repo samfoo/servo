@@ -18,6 +18,7 @@ use dom::bindings::js::{JS, MutNullableHeap, Root};
 use dom::bindings::utils::Reflectable;
 use dom::cssstyledeclaration::{CSSStyleDeclaration, CSSModificationAccess};
 use dom::document::{Document, DocumentElement};
+use dom::window::WindowElement;
 use dom::domstringmap::DOMStringMap;
 use dom::element::{AttributeMutation, Element, ElementTypeId};
 use dom::eventtarget::{EventTarget, EventTargetTypeId};

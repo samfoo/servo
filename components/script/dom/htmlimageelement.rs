@@ -20,6 +20,7 @@ use dom::event::{Event, EventBubbles, EventCancelable};
 use dom::eventtarget::{EventTarget, EventTargetTypeId};
 use dom::htmlelement::{HTMLElement, HTMLElementTypeId};
 use dom::node::{document_from_node, Node, NodeTypeId, NodeDamage, window_from_node};
+use dom::window::WindowElement;
 use dom::virtualmethods::VirtualMethods;
 use ipc_channel::ipc;
 use ipc_channel::router::ROUTER;

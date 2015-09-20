@@ -22,6 +22,7 @@ use dom::eventtarget::{EventTarget, EventTargetTypeId};
 use dom::htmlelement::{HTMLElement, HTMLElementTypeId};
 use dom::node::{Node, NodeTypeId, window_from_node};
 use dom::virtualmethods::VirtualMethods;
+use dom::window::WindowElement;
 use layout_interface::{LayoutChan, Msg};
 use msg::constellation_msg::ConstellationChan;
 use msg::constellation_msg::Msg as ConstellationMsg;

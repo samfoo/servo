@@ -11,6 +11,7 @@ use dom::bindings::str::USVString;
 use dom::bindings::utils::{Reflector, reflect_dom_object};
 use dom::urlhelper::UrlHelper;
 use dom::window::Window;
+use dom::window::WindowElement;
 use url::{Url, UrlParser};
 use util::str::DOMString;
 

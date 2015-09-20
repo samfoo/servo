@@ -12,6 +12,7 @@ use dom::bindings::utils::{Reflector, reflect_dom_object};
 use dom::event::{EventBubbles, EventCancelable};
 use dom::storageevent::StorageEvent;
 use dom::urlhelper::UrlHelper;
+use dom::window::WindowElement;
 use ipc_channel::ipc;
 use net_traits::storage_task::{StorageTask, StorageTaskMsg, StorageType};
 use page::IterablePage;

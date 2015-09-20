@@ -23,7 +23,7 @@ use dom::htmlelement::{HTMLElement, HTMLElementTypeId};
 use dom::node::{Node, NodeTypeId, window_from_node};
 use dom::urlhelper::UrlHelper;
 use dom::virtualmethods::VirtualMethods;
-use dom::window::Window;
+use dom::window::{Window, WindowElement};
 use js::jsapi::{RootedValue, JSAutoRequest, JSAutoCompartment};
 use js::jsval::UndefinedValue;
 use msg::constellation_msg::IFrameSandboxState::{IFrameSandboxed, IFrameUnsandboxed};

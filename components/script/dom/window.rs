@@ -120,7 +120,7 @@ pub struct Window {
     image_cache_chan: ImageCacheChan,
     #[ignore_heap_size_of = "TODO(#6911) newtypes containing unmeasurable types are hard"]
     compositor: IpcSender<ScriptToCompositorMsg>,
-    browsing_context: DOMRefCell<Option<BrowsingContext>>,
+    browsing_context: DOMRefCell<Option<BrowsingContext<Document>>>,
     page: Rc<Page>,
     performance: MutNullableHeap<JS<Performance>>,
     navigation_start: u64,
@@ -218,9 +218,78 @@ pub struct Window {
     current_viewport: Cell<Rect<Au>>
 }
 
-impl Window {
+pub trait WindowElement: WindowMethods {
+    fn clear_js_runtime_for_script_deallocation(&self);
+    fn get_cx(&self) -> *mut JSContext;
+    fn script_chan(&self) -> Box<ScriptChan + Send>;
+    fn main_thread_script_chan(&self) -> &Sender<MainThreadScriptMsg>;
+    fn image_cache_chan(&self) -> ImageCacheChan;
+    fn get_next_worker_id(&self) -> WorkerId;
+    fn pipeline(&self) -> PipelineId;
+    fn subpage(&self) -> Option<SubpageId>;
+    fn parent_info(&self) -> Option<(PipelineId, SubpageId)>;
+    fn new_script_pair(&self) -> (Box<ScriptChan + Send>, Box<ScriptPort + Send>);
+    fn image_cache_task(&self) -> &ImageCacheTask;
+    fn compositor(&self) -> &IpcSender<ScriptToCompositorMsg>;
+    fn browsing_context(&self) -> Ref<Option<BrowsingContext<Document>>>;
+    fn page(&self) -> &Page;
+    fn storage_task(&self) -> StorageTask;
+    fn clear_js_runtime(&self);
+    fn scroll(&self, x_: f64, y_: f64, behavior: ScrollBehavior);
+    fn perform_a_scroll(&self, x: f32, y: f32, behavior: ScrollBehavior, element: Option<&Element>);
+    fn client_window(&self) -> (Size2D<u32>, Point2D<i32>);
+    fn force_reflow(&self, goal: ReflowGoal, query_type: ReflowQueryType, reason: ReflowReason);
+    fn reflow(&self, goal: ReflowGoal, query_type: ReflowQueryType, reason: ReflowReason);
+    fn join_layout(&self);
+    fn layout(&self) -> &LayoutRPC;
+    fn content_box_query(&self, content_box_request: TrustedNodeAddress) -> Rect<Au>;
+    fn content_boxes_query(&self, content_boxes_request: TrustedNodeAddress) -> Vec<Rect<Au>>;
+    fn client_rect_query(&self, node_geometry_request: TrustedNodeAddress) -> Rect<i32>;
+    fn resolved_style_query(&self,
+                        element: TrustedNodeAddress,
+                        pseudo: Option<PseudoElement>,
+                        property: &Atom) -> Option<String>;
+    fn offset_parent_query(&self, node: TrustedNodeAddress) -> (Option<Root<Element>>, Rect<Au>);
+    fn handle_reflow_complete_msg(&self, reflow_id: u32);
+    fn init_browsing_context(&self, doc: &Document, frame_element: Option<&Element>);
+    fn load_url(&self, url: Url);
+    fn handle_fire_timer(&self, timer_id: TimerId);
+    fn set_fragment_name(&self, fragment: Option<String>);
+    fn steal_fragment_name(&self) -> Option<String>;
+    fn set_window_size(&self, size: WindowSizeData);
+    fn window_size(&self) -> Option<WindowSizeData>;
+    fn get_url(&self) -> Url;
+    fn resource_task(&self) -> ResourceTask;
+    fn mem_profiler_chan(&self) -> mem::ProfilerChan;
+    fn devtools_chan(&self) -> Option<IpcSender<ScriptToDevtoolsControlMsg>>;
+    fn layout_chan(&self) -> LayoutChan;
+    fn constellation_chan(&self) -> ConstellationChan;
+    fn windowproxy_handler(&self) -> WindowProxyHandler;
+    fn get_next_subpage_id(&self) -> SubpageId;
+    fn layout_is_idle(&self) -> bool;
+    fn get_pending_reflow_count(&self) -> u32;
+    fn add_pending_reflow(&self);
+    fn set_resize_event(&self, event: WindowSizeData);
+    fn steal_resize_event(&self) -> Option<WindowSizeData>;
+    fn set_page_clip_rect_with_new_viewport(&self, viewport: Rect<f32>) -> bool;
+    fn set_devtools_wants_updates(&self, value: bool);
+    fn IndexedGetter(&self, _index: u32, _found: &mut bool) -> Option<Root<Window>>;
+    fn thaw(&self);
+    fn freeze(&self);
+    fn need_emit_timeline_marker(&self, timeline_type: TimelineMarkerType) -> bool;
+    fn emit_timeline_marker(&self, marker: TimelineMarker);
+    fn set_devtools_timeline_markers(&self,
+                                     markers: Vec<TimelineMarkerType>,
+                                     reply: IpcSender<TimelineMarker>);
+    fn drop_devtools_timeline_markers(&self, markers: Vec<TimelineMarkerType>);
+    fn set_webdriver_script_chan(&self, chan: Option<IpcSender<WebDriverJSResult>>);
+    fn is_alive(&self) -> bool;
+    fn parent(&self) -> Option<Root<Window>>;
+}
+
+impl WindowElement for Window {
     #[allow(unsafe_code)]
-    pub fn clear_js_runtime_for_script_deallocation(&self) {
+    fn clear_js_runtime_for_script_deallocation(&self) {
         unsafe {
             *self.js_runtime.borrow_for_script_deallocation() = None;
             *self.browsing_context.borrow_for_script_deallocation() = None;
@@ -228,65 +297,529 @@ impl Window {
         }
     }
 
-    pub fn get_cx(&self) -> *mut JSContext {
+    fn get_cx(&self) -> *mut JSContext {
         self.js_runtime.borrow().as_ref().unwrap().cx()
     }
 
-    pub fn script_chan(&self) -> Box<ScriptChan + Send> {
+    fn script_chan(&self) -> Box<ScriptChan + Send> {
         self.script_chan.clone()
     }
 
-    pub fn main_thread_script_chan(&self) -> &Sender<MainThreadScriptMsg> {
+    fn main_thread_script_chan(&self) -> &Sender<MainThreadScriptMsg> {
         let MainThreadScriptChan(ref sender) = self.script_chan;
         sender
     }
 
-    pub fn image_cache_chan(&self) -> ImageCacheChan {
+    fn image_cache_chan(&self) -> ImageCacheChan {
         self.image_cache_chan.clone()
     }
 
-    pub fn get_next_worker_id(&self) -> WorkerId {
+    fn get_next_worker_id(&self) -> WorkerId {
         let worker_id = self.next_worker_id.get();
         let WorkerId(id_num) = worker_id;
         self.next_worker_id.set(WorkerId(id_num + 1));
         worker_id
     }
 
-    pub fn pipeline(&self) -> PipelineId {
+    fn pipeline(&self) -> PipelineId {
         self.id
     }
 
-    pub fn subpage(&self) -> Option<SubpageId> {
+    fn subpage(&self) -> Option<SubpageId> {
         self.parent_info.map(|p| p.1)
     }
 
-    pub fn parent_info(&self) -> Option<(PipelineId, SubpageId)> {
+    fn parent_info(&self) -> Option<(PipelineId, SubpageId)> {
         self.parent_info
     }
 
-    pub fn new_script_pair(&self) -> (Box<ScriptChan + Send>, Box<ScriptPort + Send>) {
+    fn new_script_pair(&self) -> (Box<ScriptChan + Send>, Box<ScriptPort + Send>) {
         let (tx, rx) = channel();
         (box SendableMainThreadScriptChan(tx), box rx)
     }
 
-    pub fn image_cache_task(&self) -> &ImageCacheTask {
+    fn image_cache_task(&self) -> &ImageCacheTask {
         &self.image_cache_task
     }
 
-    pub fn compositor(&self) -> &IpcSender<ScriptToCompositorMsg> {
+    fn compositor(&self) -> &IpcSender<ScriptToCompositorMsg> {
         &self.compositor
     }
 
-    pub fn browsing_context(&self) -> Ref<Option<BrowsingContext>> {
+    fn browsing_context(&self) -> Ref<Option<BrowsingContext<Document>>> {
         self.browsing_context.borrow()
     }
 
-    pub fn page(&self) -> &Page {
+    fn page(&self) -> &Page {
         &*self.page
     }
 
-    pub fn storage_task(&self) -> StorageTask {
+    fn storage_task(&self) -> StorageTask {
         self.storage_task.clone()
+    }
+
+    fn clear_js_runtime(&self) {
+        let document = self.Document();
+        NodeCast::from_ref(document.r()).teardown();
+
+        // The above code may not catch all DOM objects
+        // (e.g. DOM objects removed from the tree that haven't
+        // been collected yet). Forcing a GC here means that
+        // those DOM objects will be able to call dispose()
+        // to free their layout data before the layout task
+        // exits. Without this, those remaining objects try to
+        // send a message to free their layout data to the
+        // layout task when the script task is dropped,
+        // which causes a panic!
+        self.Gc();
+
+        self.current_state.set(WindowState::Zombie);
+        *self.js_runtime.borrow_mut() = None;
+        *self.browsing_context.borrow_mut() = None;
+    }
+
+    /// https://drafts.csswg.org/cssom-view/#dom-window-scroll
+    fn scroll(&self, x_: f64, y_: f64, behavior: ScrollBehavior) {
+        // Step 3
+        let xfinite = if x_.is_finite() { x_ } else { 0.0f64 };
+        let yfinite = if y_.is_finite() { y_ } else { 0.0f64 };
+
+        // Step 4
+        if self.window_size.get().is_none() {
+            return;
+        }
+
+        // Step 5
+        //TODO remove scrollbar width
+        let width = self.InnerWidth() as f64;
+        // Step 6
+        //TODO remove scrollbar height
+        let height = self.InnerHeight() as f64;
+
+        // Step 7 & 8
+        //TODO use overflow direction
+        let body = self.Document().GetBody();
+        let (x, y) = match body {
+            Some(e) => {
+                let node = NodeCast::from_ref(e.r());
+                let content_size = node.get_bounding_content_box();
+
+                let content_height = content_size.size.height.to_f64_px();
+                let content_width = content_size.size.width.to_f64_px();
+                (xfinite.max(0.0f64).min(content_width - width),
+                 yfinite.max(0.0f64).min(content_height - height))
+            },
+            None => {
+                (xfinite.max(0.0f64), yfinite.max(0.0f64))
+            }
+        };
+
+        // Step 10
+        //TODO handling ongoing smooth scrolling
+        if x == self.ScrollX() as f64 && y == self.ScrollY() as f64 {
+            return;
+        }
+
+        //TODO Step 11
+        //let document = self.Document();
+        // Step 12
+        self.perform_a_scroll(x.to_f32().unwrap_or(0.0f32), y.to_f32().unwrap_or(0.0f32), behavior, None);
+    }
+
+    /// https://drafts.csswg.org/cssom-view/#perform-a-scroll
+    fn perform_a_scroll(&self, x: f32, y: f32, behavior: ScrollBehavior, element: Option<&Element>) {
+        //TODO Step 1
+        let point = Point2D::new(x, y);
+        let smooth = match behavior {
+            ScrollBehavior::Auto => {
+                element.map(|_element| {
+                    // TODO check computed scroll-behaviour CSS property
+                    true
+                }).unwrap_or(false)
+            }
+            ScrollBehavior::Instant => false,
+            ScrollBehavior::Smooth => true
+        };
+
+        // TODO (farodin91): Raise an event to stop the current_viewport
+        let size = self.current_viewport.get().size;
+        self.current_viewport.set(Rect::new(Point2D::new(Au::from_f32_px(x), Au::from_f32_px(y)), size));
+
+        self.compositor.send(ScriptToCompositorMsg::ScrollFragmentPoint(
+                                                         self.pipeline(), LayerId::null(), point, smooth)).unwrap()
+    }
+
+    fn client_window(&self) -> (Size2D<u32>, Point2D<i32>) {
+        let (send, recv) = ipc::channel::<(Size2D<u32>, Point2D<i32>)>().unwrap();
+        self.compositor.send(ScriptToCompositorMsg::GetClientWindow(send)).unwrap();
+        recv.recv().unwrap_or((Size2D::zero(), Point2D::zero()))
+    }
+
+    /// Reflows the page unconditionally. This method will wait for the layout thread to complete
+    /// (but see the `TODO` below). If there is no window size yet, the page is presumed invisible
+    /// and no reflow is performed.
+    ///
+    /// TODO(pcwalton): Only wait for style recalc, since we have off-main-thread layout.
+    fn force_reflow(&self, goal: ReflowGoal, query_type: ReflowQueryType, reason: ReflowReason) {
+        let document = self.Document();
+        let root = document.r().GetDocumentElement();
+        let root = match root.r() {
+            Some(root) => root,
+            None => return,
+        };
+        let root = NodeCast::from_ref(root);
+
+        let window_size = match self.window_size.get() {
+            Some(window_size) => window_size,
+            None => return,
+        };
+
+        debug!("script: performing reflow for goal {:?} reason {:?}", goal, reason);
+
+        let marker = if self.need_emit_timeline_marker(TimelineMarkerType::Reflow) {
+            Some(TimelineMarker::start("Reflow".to_owned()))
+        } else {
+            None
+        };
+
+        // Layout will let us know when it's done.
+        let (join_chan, join_port) = channel();
+
+        {
+            let mut layout_join_port = self.layout_join_port.borrow_mut();
+            *layout_join_port = Some(join_port);
+        }
+
+        let last_reflow_id = &self.last_reflow_id;
+        last_reflow_id.set(last_reflow_id.get() + 1);
+
+        // On debug mode, print the reflow event information.
+        if opts::get().relayout_event {
+            debug_reflow_events(&goal, &query_type, &reason);
+        }
+
+        // Send new document and relevant styles to layout.
+        let reflow = box ScriptReflow {
+            reflow_info: Reflow {
+                goal: goal,
+                page_clip_rect: self.page_clip_rect.get(),
+            },
+            document_root: root.to_trusted_node_address(),
+            window_size: window_size,
+            script_chan: self.control_chan.clone(),
+            script_join_chan: join_chan,
+            id: last_reflow_id.get(),
+            query_type: query_type,
+        };
+
+        let LayoutChan(ref chan) = self.layout_chan;
+        chan.send(Msg::Reflow(reflow)).unwrap();
+
+        debug!("script: layout forked");
+
+        self.join_layout();
+
+        self.pending_reflow_count.set(0);
+
+        if let Some(marker) = marker {
+            self.emit_timeline_marker(marker.end());
+        }
+    }
+
+    /// Reflows the page if it's possible to do so and the page is dirty. This method will wait
+    /// for the layout thread to complete (but see the `TODO` below). If there is no window size
+    /// yet, the page is presumed invisible and no reflow is performed.
+    ///
+    /// TODO(pcwalton): Only wait for style recalc, since we have off-main-thread layout.
+    fn reflow(&self, goal: ReflowGoal, query_type: ReflowQueryType, reason: ReflowReason) {
+        let document = self.Document();
+        let root = document.r().GetDocumentElement();
+        let root = match root.r() {
+            Some(root) => root,
+            None => return,
+        };
+
+        let root = NodeCast::from_ref(root);
+        if query_type == ReflowQueryType::NoQuery && !root.get_has_dirty_descendants() {
+            debug!("root has no dirty descendants; avoiding reflow (reason {:?})", reason);
+            return
+        }
+
+        self.force_reflow(goal, query_type, reason)
+    }
+
+    // FIXME(cgaebel): join_layout is racey. What if the compositor triggers a
+    // reflow between the "join complete" message and returning from this
+    // function?
+
+    /// Sends a ping to layout and waits for the response. The response will arrive when the
+    /// layout task has finished any pending request messages.
+    fn join_layout(&self) {
+        let mut layout_join_port = self.layout_join_port.borrow_mut();
+        if let Some(join_port) = std_mem::replace(&mut *layout_join_port, None) {
+            match join_port.try_recv() {
+                Err(Empty) => {
+                    info!("script: waiting on layout");
+                    join_port.recv().unwrap();
+                }
+                Ok(_) => {}
+                Err(Disconnected) => {
+                    panic!("Layout task failed while script was waiting for a result.");
+                }
+            }
+
+            debug!("script: layout joined")
+        }
+    }
+
+    fn layout(&self) -> &LayoutRPC {
+        &*self.layout_rpc
+    }
+
+    fn content_box_query(&self, content_box_request: TrustedNodeAddress) -> Rect<Au> {
+        self.reflow(ReflowGoal::ForScriptQuery,
+                    ReflowQueryType::ContentBoxQuery(content_box_request),
+                    ReflowReason::Query);
+        self.join_layout(); //FIXME: is this necessary, or is layout_rpc's mutex good enough?
+        let ContentBoxResponse(rect) = self.layout_rpc.content_box();
+        rect
+    }
+
+    fn content_boxes_query(&self, content_boxes_request: TrustedNodeAddress) -> Vec<Rect<Au>> {
+        self.reflow(ReflowGoal::ForScriptQuery,
+                    ReflowQueryType::ContentBoxesQuery(content_boxes_request),
+                    ReflowReason::Query);
+        self.join_layout(); //FIXME: is this necessary, or is layout_rpc's mutex good enough?
+        let ContentBoxesResponse(rects) = self.layout_rpc.content_boxes();
+        rects
+    }
+
+    fn client_rect_query(&self, node_geometry_request: TrustedNodeAddress) -> Rect<i32> {
+        self.reflow(ReflowGoal::ForScriptQuery,
+                    ReflowQueryType::NodeGeometryQuery(node_geometry_request),
+                    ReflowReason::Query);
+        self.layout_rpc.node_geometry().client_rect
+    }
+
+    fn resolved_style_query(&self,
+                            element: TrustedNodeAddress,
+                            pseudo: Option<PseudoElement>,
+                            property: &Atom) -> Option<String> {
+        self.reflow(ReflowGoal::ForScriptQuery,
+                    ReflowQueryType::ResolvedStyleQuery(element, pseudo, property.clone()),
+                    ReflowReason::Query);
+        let ResolvedStyleResponse(resolved) = self.layout_rpc.resolved_style();
+        resolved
+    }
+
+    fn offset_parent_query(&self, node: TrustedNodeAddress) -> (Option<Root<Element>>, Rect<Au>) {
+        self.reflow(ReflowGoal::ForScriptQuery,
+                    ReflowQueryType::OffsetParentQuery(node),
+                    ReflowReason::Query);
+        let response = self.layout_rpc.offset_parent();
+        let js_runtime = self.js_runtime.borrow();
+        let js_runtime = js_runtime.as_ref().unwrap();
+        let element = response.node_address.and_then(|parent_node_address| {
+            let node = from_untrusted_node_address(js_runtime.rt(), parent_node_address);
+            ElementCast::to_root(node)
+        });
+        (element, response.rect)
+    }
+
+    fn handle_reflow_complete_msg(&self, reflow_id: u32) {
+        let last_reflow_id = self.last_reflow_id.get();
+        if last_reflow_id == reflow_id {
+            *self.layout_join_port.borrow_mut() = None;
+        }
+    }
+
+    fn init_browsing_context(&self, doc: &Document, frame_element: Option<&Element>) {
+        let mut browsing_context = self.browsing_context.borrow_mut();
+        *browsing_context = Some(BrowsingContext::new(doc, frame_element));
+        (*browsing_context).as_mut().unwrap().create_window_proxy();
+    }
+
+    /// Commence a new URL load which will either replace this window or scroll to a fragment.
+    fn load_url(&self, url: Url) {
+        self.main_thread_script_chan().send(
+            MainThreadScriptMsg::Navigate(self.id, LoadData::new(url))).unwrap();
+    }
+
+    fn handle_fire_timer(&self, timer_id: TimerId) {
+        self.timers.fire_timer(timer_id, self);
+        self.reflow(ReflowGoal::ForDisplay, ReflowQueryType::NoQuery, ReflowReason::Timer);
+    }
+
+    fn set_fragment_name(&self, fragment: Option<String>) {
+        *self.fragment_name.borrow_mut() = fragment;
+    }
+
+    fn steal_fragment_name(&self) -> Option<String> {
+        self.fragment_name.borrow_mut().take()
+    }
+
+    fn set_window_size(&self, size: WindowSizeData) {
+        self.window_size.set(Some(size));
+    }
+
+    fn window_size(&self) -> Option<WindowSizeData> {
+        self.window_size.get()
+    }
+
+    fn get_url(&self) -> Url {
+        let doc = self.Document();
+        doc.r().url()
+    }
+
+    fn resource_task(&self) -> ResourceTask {
+        (*self.resource_task).clone()
+    }
+
+    fn mem_profiler_chan(&self) -> mem::ProfilerChan {
+        self.mem_profiler_chan.clone()
+    }
+
+    fn devtools_chan(&self) -> Option<IpcSender<ScriptToDevtoolsControlMsg>> {
+        self.devtools_chan.clone()
+    }
+
+    fn layout_chan(&self) -> LayoutChan {
+        self.layout_chan.clone()
+    }
+
+    fn constellation_chan(&self) -> ConstellationChan {
+        self.constellation_chan.clone()
+    }
+
+    fn windowproxy_handler(&self) -> WindowProxyHandler {
+        WindowProxyHandler(self.dom_static.windowproxy_handler.0)
+    }
+
+    fn get_next_subpage_id(&self) -> SubpageId {
+        let subpage_id = self.next_subpage_id.get();
+        let SubpageId(id_num) = subpage_id;
+        self.next_subpage_id.set(SubpageId(id_num + 1));
+        subpage_id
+    }
+
+    fn layout_is_idle(&self) -> bool {
+        self.layout_join_port.borrow().is_none()
+    }
+
+    fn get_pending_reflow_count(&self) -> u32 {
+        self.pending_reflow_count.get()
+    }
+
+    fn add_pending_reflow(&self) {
+        self.pending_reflow_count.set(self.pending_reflow_count.get() + 1);
+    }
+
+    fn set_resize_event(&self, event: WindowSizeData) {
+        self.resize_event.set(Some(event));
+    }
+
+    fn steal_resize_event(&self) -> Option<WindowSizeData> {
+        let event = self.resize_event.get();
+        self.resize_event.set(None);
+        event
+    }
+
+    fn set_page_clip_rect_with_new_viewport(&self, viewport: Rect<f32>) -> bool {
+        let rect = geometry::f32_rect_to_au_rect(viewport.clone());
+        self.current_viewport.set(rect);
+        // We use a clipping rectangle that is five times the size of the of the viewport,
+        // so that we don't collect display list items for areas too far outside the viewport,
+        // but also don't trigger reflows every time the viewport changes.
+        static VIEWPORT_EXPANSION: f32 = 2.0; // 2 lengths on each side plus original length is 5 total.
+        let proposed_clip_rect = geometry::f32_rect_to_au_rect(
+            viewport.inflate(viewport.size.width * VIEWPORT_EXPANSION,
+            viewport.size.height * VIEWPORT_EXPANSION));
+        let clip_rect = self.page_clip_rect.get();
+        if proposed_clip_rect == clip_rect {
+            return false;
+        }
+
+        let had_clip_rect = clip_rect != MAX_RECT;
+        if had_clip_rect && !should_move_clip_rect(clip_rect, viewport) {
+            return false;
+        }
+
+        self.page_clip_rect.set(proposed_clip_rect);
+
+        // If we didn't have a clip rect, the previous display doesn't need rebuilding
+        // because it was built for infinite clip (MAX_RECT).
+        had_clip_rect
+    }
+
+    fn set_devtools_wants_updates(&self, value: bool) {
+        self.devtools_wants_updates.set(value);
+    }
+
+    // https://html.spec.whatwg.org/multipage/#accessing-other-browsing-contexts
+    fn IndexedGetter(&self, _index: u32, _found: &mut bool) -> Option<Root<Window>> {
+        None
+    }
+
+    fn thaw(&self) {
+        self.timers.resume();
+
+        // Push the document title to the compositor since we are
+        // activating this document due to a navigation.
+        let document = self.Document();
+        document.r().title_changed();
+    }
+
+    fn freeze(&self) {
+        self.timers.suspend();
+    }
+
+    fn need_emit_timeline_marker(&self, timeline_type: TimelineMarkerType) -> bool {
+        let markers = self.devtools_markers.borrow();
+        markers.contains(&timeline_type)
+    }
+
+    fn emit_timeline_marker(&self, marker: TimelineMarker) {
+        let sender = self.devtools_marker_sender.borrow();
+        let sender = sender.as_ref().expect("There is no marker sender");
+        sender.send(marker).unwrap();
+    }
+
+    fn set_devtools_timeline_markers(&self,
+                                         markers: Vec<TimelineMarkerType>,
+                                         reply: IpcSender<TimelineMarker>) {
+        *self.devtools_marker_sender.borrow_mut() = Some(reply);
+        self.devtools_markers.borrow_mut().extend(markers.into_iter());
+    }
+
+    fn drop_devtools_timeline_markers(&self, markers: Vec<TimelineMarkerType>) {
+        let mut devtools_markers = self.devtools_markers.borrow_mut();
+        for marker in markers {
+            devtools_markers.remove(&marker);
+        }
+        if devtools_markers.is_empty() {
+            *self.devtools_marker_sender.borrow_mut() = None;
+        }
+    }
+
+    fn set_webdriver_script_chan(&self, chan: Option<IpcSender<WebDriverJSResult>>) {
+        *self.webdriver_script_chan.borrow_mut() = chan;
+    }
+
+    fn is_alive(&self) -> bool {
+        self.current_state.get() == WindowState::Alive
+    }
+
+    fn parent(&self) -> Option<Root<Window>> {
+        let browsing_context = self.browsing_context();
+        let browsing_context = browsing_context.as_ref().unwrap();
+
+        browsing_context.frame_element().map(|frame_element| {
+            let window = window_from_node(frame_element.r());
+            // FIXME(https://github.com/rust-lang/rust/issues/23338)
+            let r = window.r();
+            let context = r.browsing_context();
+            context.as_ref().unwrap().active_window()
+        })
     }
 }
 
@@ -784,472 +1317,6 @@ impl<'a, T: Reflectable> ScriptHelpers for &'a T {
                 report_pending_exception(cx, globalhandle.get());
             }
         }
-    }
-}
-
-impl Window {
-    pub fn clear_js_runtime(&self) {
-        let document = self.Document();
-        NodeCast::from_ref(document.r()).teardown();
-
-        // The above code may not catch all DOM objects
-        // (e.g. DOM objects removed from the tree that haven't
-        // been collected yet). Forcing a GC here means that
-        // those DOM objects will be able to call dispose()
-        // to free their layout data before the layout task
-        // exits. Without this, those remaining objects try to
-        // send a message to free their layout data to the
-        // layout task when the script task is dropped,
-        // which causes a panic!
-        self.Gc();
-
-        self.current_state.set(WindowState::Zombie);
-        *self.js_runtime.borrow_mut() = None;
-        *self.browsing_context.borrow_mut() = None;
-    }
-
-    /// https://drafts.csswg.org/cssom-view/#dom-window-scroll
-    pub fn scroll(&self, x_: f64, y_: f64, behavior: ScrollBehavior) {
-        // Step 3
-        let xfinite = if x_.is_finite() { x_ } else { 0.0f64 };
-        let yfinite = if y_.is_finite() { y_ } else { 0.0f64 };
-
-        // Step 4
-        if self.window_size.get().is_none() {
-            return;
-        }
-
-        // Step 5
-        //TODO remove scrollbar width
-        let width = self.InnerWidth() as f64;
-        // Step 6
-        //TODO remove scrollbar height
-        let height = self.InnerHeight() as f64;
-
-        // Step 7 & 8
-        //TODO use overflow direction
-        let body = self.Document().GetBody();
-        let (x, y) = match body {
-            Some(e) => {
-                let node = NodeCast::from_ref(e.r());
-                let content_size = node.get_bounding_content_box();
-
-                let content_height = content_size.size.height.to_f64_px();
-                let content_width = content_size.size.width.to_f64_px();
-                (xfinite.max(0.0f64).min(content_width - width),
-                 yfinite.max(0.0f64).min(content_height - height))
-            },
-            None => {
-                (xfinite.max(0.0f64), yfinite.max(0.0f64))
-            }
-        };
-
-        // Step 10
-        //TODO handling ongoing smooth scrolling
-        if x == self.ScrollX() as f64 && y == self.ScrollY() as f64 {
-            return;
-        }
-
-        //TODO Step 11
-        //let document = self.Document();
-        // Step 12
-        self.perform_a_scroll(x.to_f32().unwrap_or(0.0f32), y.to_f32().unwrap_or(0.0f32), behavior, None);
-    }
-
-    /// https://drafts.csswg.org/cssom-view/#perform-a-scroll
-    pub fn perform_a_scroll(&self, x: f32, y: f32, behavior: ScrollBehavior, element: Option<&Element>) {
-        //TODO Step 1
-        let point = Point2D::new(x, y);
-        let smooth = match behavior {
-            ScrollBehavior::Auto => {
-                element.map(|_element| {
-                    // TODO check computed scroll-behaviour CSS property
-                    true
-                }).unwrap_or(false)
-            }
-            ScrollBehavior::Instant => false,
-            ScrollBehavior::Smooth => true
-        };
-
-        // TODO (farodin91): Raise an event to stop the current_viewport
-        let size = self.current_viewport.get().size;
-        self.current_viewport.set(Rect::new(Point2D::new(Au::from_f32_px(x), Au::from_f32_px(y)), size));
-
-        self.compositor.send(ScriptToCompositorMsg::ScrollFragmentPoint(
-                                                         self.pipeline(), LayerId::null(), point, smooth)).unwrap()
-    }
-
-    pub fn client_window(&self) -> (Size2D<u32>, Point2D<i32>) {
-        let (send, recv) = ipc::channel::<(Size2D<u32>, Point2D<i32>)>().unwrap();
-        self.compositor.send(ScriptToCompositorMsg::GetClientWindow(send)).unwrap();
-        recv.recv().unwrap_or((Size2D::zero(), Point2D::zero()))
-    }
-
-    /// Reflows the page unconditionally. This method will wait for the layout thread to complete
-    /// (but see the `TODO` below). If there is no window size yet, the page is presumed invisible
-    /// and no reflow is performed.
-    ///
-    /// TODO(pcwalton): Only wait for style recalc, since we have off-main-thread layout.
-    pub fn force_reflow(&self, goal: ReflowGoal, query_type: ReflowQueryType, reason: ReflowReason) {
-        let document = self.Document();
-        let root = document.r().GetDocumentElement();
-        let root = match root.r() {
-            Some(root) => root,
-            None => return,
-        };
-        let root = NodeCast::from_ref(root);
-
-        let window_size = match self.window_size.get() {
-            Some(window_size) => window_size,
-            None => return,
-        };
-
-        debug!("script: performing reflow for goal {:?} reason {:?}", goal, reason);
-
-        let marker = if self.need_emit_timeline_marker(TimelineMarkerType::Reflow) {
-            Some(TimelineMarker::start("Reflow".to_owned()))
-        } else {
-            None
-        };
-
-        // Layout will let us know when it's done.
-        let (join_chan, join_port) = channel();
-
-        {
-            let mut layout_join_port = self.layout_join_port.borrow_mut();
-            *layout_join_port = Some(join_port);
-        }
-
-        let last_reflow_id = &self.last_reflow_id;
-        last_reflow_id.set(last_reflow_id.get() + 1);
-
-        // On debug mode, print the reflow event information.
-        if opts::get().relayout_event {
-            debug_reflow_events(&goal, &query_type, &reason);
-        }
-
-        // Send new document and relevant styles to layout.
-        let reflow = box ScriptReflow {
-            reflow_info: Reflow {
-                goal: goal,
-                page_clip_rect: self.page_clip_rect.get(),
-            },
-            document_root: root.to_trusted_node_address(),
-            window_size: window_size,
-            script_chan: self.control_chan.clone(),
-            script_join_chan: join_chan,
-            id: last_reflow_id.get(),
-            query_type: query_type,
-        };
-
-        let LayoutChan(ref chan) = self.layout_chan;
-        chan.send(Msg::Reflow(reflow)).unwrap();
-
-        debug!("script: layout forked");
-
-        self.join_layout();
-
-        self.pending_reflow_count.set(0);
-
-        if let Some(marker) = marker {
-            self.emit_timeline_marker(marker.end());
-        }
-    }
-
-    /// Reflows the page if it's possible to do so and the page is dirty. This method will wait
-    /// for the layout thread to complete (but see the `TODO` below). If there is no window size
-    /// yet, the page is presumed invisible and no reflow is performed.
-    ///
-    /// TODO(pcwalton): Only wait for style recalc, since we have off-main-thread layout.
-    pub fn reflow(&self, goal: ReflowGoal, query_type: ReflowQueryType, reason: ReflowReason) {
-        let document = self.Document();
-        let root = document.r().GetDocumentElement();
-        let root = match root.r() {
-            Some(root) => root,
-            None => return,
-        };
-
-        let root = NodeCast::from_ref(root);
-        if query_type == ReflowQueryType::NoQuery && !root.get_has_dirty_descendants() {
-            debug!("root has no dirty descendants; avoiding reflow (reason {:?})", reason);
-            return
-        }
-
-        self.force_reflow(goal, query_type, reason)
-    }
-
-    // FIXME(cgaebel): join_layout is racey. What if the compositor triggers a
-    // reflow between the "join complete" message and returning from this
-    // function?
-
-    /// Sends a ping to layout and waits for the response. The response will arrive when the
-    /// layout task has finished any pending request messages.
-    pub fn join_layout(&self) {
-        let mut layout_join_port = self.layout_join_port.borrow_mut();
-        if let Some(join_port) = std_mem::replace(&mut *layout_join_port, None) {
-            match join_port.try_recv() {
-                Err(Empty) => {
-                    info!("script: waiting on layout");
-                    join_port.recv().unwrap();
-                }
-                Ok(_) => {}
-                Err(Disconnected) => {
-                    panic!("Layout task failed while script was waiting for a result.");
-                }
-            }
-
-            debug!("script: layout joined")
-        }
-    }
-
-    pub fn layout(&self) -> &LayoutRPC {
-        &*self.layout_rpc
-    }
-
-    pub fn content_box_query(&self, content_box_request: TrustedNodeAddress) -> Rect<Au> {
-        self.reflow(ReflowGoal::ForScriptQuery,
-                    ReflowQueryType::ContentBoxQuery(content_box_request),
-                    ReflowReason::Query);
-        self.join_layout(); //FIXME: is this necessary, or is layout_rpc's mutex good enough?
-        let ContentBoxResponse(rect) = self.layout_rpc.content_box();
-        rect
-    }
-
-    pub fn content_boxes_query(&self, content_boxes_request: TrustedNodeAddress) -> Vec<Rect<Au>> {
-        self.reflow(ReflowGoal::ForScriptQuery,
-                    ReflowQueryType::ContentBoxesQuery(content_boxes_request),
-                    ReflowReason::Query);
-        self.join_layout(); //FIXME: is this necessary, or is layout_rpc's mutex good enough?
-        let ContentBoxesResponse(rects) = self.layout_rpc.content_boxes();
-        rects
-    }
-
-    pub fn client_rect_query(&self, node_geometry_request: TrustedNodeAddress) -> Rect<i32> {
-        self.reflow(ReflowGoal::ForScriptQuery,
-                    ReflowQueryType::NodeGeometryQuery(node_geometry_request),
-                    ReflowReason::Query);
-        self.layout_rpc.node_geometry().client_rect
-    }
-
-    pub fn resolved_style_query(&self,
-                            element: TrustedNodeAddress,
-                            pseudo: Option<PseudoElement>,
-                            property: &Atom) -> Option<String> {
-        self.reflow(ReflowGoal::ForScriptQuery,
-                    ReflowQueryType::ResolvedStyleQuery(element, pseudo, property.clone()),
-                    ReflowReason::Query);
-        let ResolvedStyleResponse(resolved) = self.layout_rpc.resolved_style();
-        resolved
-    }
-
-    pub fn offset_parent_query(&self, node: TrustedNodeAddress) -> (Option<Root<Element>>, Rect<Au>) {
-        self.reflow(ReflowGoal::ForScriptQuery,
-                    ReflowQueryType::OffsetParentQuery(node),
-                    ReflowReason::Query);
-        let response = self.layout_rpc.offset_parent();
-        let js_runtime = self.js_runtime.borrow();
-        let js_runtime = js_runtime.as_ref().unwrap();
-        let element = response.node_address.and_then(|parent_node_address| {
-            let node = from_untrusted_node_address(js_runtime.rt(), parent_node_address);
-            ElementCast::to_root(node)
-        });
-        (element, response.rect)
-    }
-
-    pub fn handle_reflow_complete_msg(&self, reflow_id: u32) {
-        let last_reflow_id = self.last_reflow_id.get();
-        if last_reflow_id == reflow_id {
-            *self.layout_join_port.borrow_mut() = None;
-        }
-    }
-
-    pub fn init_browsing_context(&self, doc: &Document, frame_element: Option<&Element>) {
-        let mut browsing_context = self.browsing_context.borrow_mut();
-        *browsing_context = Some(BrowsingContext::new(doc, frame_element));
-        (*browsing_context).as_mut().unwrap().create_window_proxy();
-    }
-
-    /// Commence a new URL load which will either replace this window or scroll to a fragment.
-    pub fn load_url(&self, url: Url) {
-        self.main_thread_script_chan().send(
-            MainThreadScriptMsg::Navigate(self.id, LoadData::new(url))).unwrap();
-    }
-
-    pub fn handle_fire_timer(&self, timer_id: TimerId) {
-        self.timers.fire_timer(timer_id, self);
-        self.reflow(ReflowGoal::ForDisplay, ReflowQueryType::NoQuery, ReflowReason::Timer);
-    }
-
-    pub fn set_fragment_name(&self, fragment: Option<String>) {
-        *self.fragment_name.borrow_mut() = fragment;
-    }
-
-    pub fn steal_fragment_name(&self) -> Option<String> {
-        self.fragment_name.borrow_mut().take()
-    }
-
-    pub fn set_window_size(&self, size: WindowSizeData) {
-        self.window_size.set(Some(size));
-    }
-
-    pub fn window_size(&self) -> Option<WindowSizeData> {
-        self.window_size.get()
-    }
-
-    pub fn get_url(&self) -> Url {
-        let doc = self.Document();
-        doc.r().url()
-    }
-
-    pub fn resource_task(&self) -> ResourceTask {
-        (*self.resource_task).clone()
-    }
-
-    pub fn mem_profiler_chan(&self) -> mem::ProfilerChan {
-        self.mem_profiler_chan.clone()
-    }
-
-    pub fn devtools_chan(&self) -> Option<IpcSender<ScriptToDevtoolsControlMsg>> {
-        self.devtools_chan.clone()
-    }
-
-    pub fn layout_chan(&self) -> LayoutChan {
-        self.layout_chan.clone()
-    }
-
-    pub fn constellation_chan(&self) -> ConstellationChan {
-        self.constellation_chan.clone()
-    }
-
-    pub fn windowproxy_handler(&self) -> WindowProxyHandler {
-        WindowProxyHandler(self.dom_static.windowproxy_handler.0)
-    }
-
-    pub fn get_next_subpage_id(&self) -> SubpageId {
-        let subpage_id = self.next_subpage_id.get();
-        let SubpageId(id_num) = subpage_id;
-        self.next_subpage_id.set(SubpageId(id_num + 1));
-        subpage_id
-    }
-
-    pub fn layout_is_idle(&self) -> bool {
-        self.layout_join_port.borrow().is_none()
-    }
-
-    pub fn get_pending_reflow_count(&self) -> u32 {
-        self.pending_reflow_count.get()
-    }
-
-    pub fn add_pending_reflow(&self) {
-        self.pending_reflow_count.set(self.pending_reflow_count.get() + 1);
-    }
-
-    pub fn set_resize_event(&self, event: WindowSizeData) {
-        self.resize_event.set(Some(event));
-    }
-
-    pub fn steal_resize_event(&self) -> Option<WindowSizeData> {
-        let event = self.resize_event.get();
-        self.resize_event.set(None);
-        event
-    }
-
-    pub fn set_page_clip_rect_with_new_viewport(&self, viewport: Rect<f32>) -> bool {
-        let rect = geometry::f32_rect_to_au_rect(viewport.clone());
-        self.current_viewport.set(rect);
-        // We use a clipping rectangle that is five times the size of the of the viewport,
-        // so that we don't collect display list items for areas too far outside the viewport,
-        // but also don't trigger reflows every time the viewport changes.
-        static VIEWPORT_EXPANSION: f32 = 2.0; // 2 lengths on each side plus original length is 5 total.
-        let proposed_clip_rect = geometry::f32_rect_to_au_rect(
-            viewport.inflate(viewport.size.width * VIEWPORT_EXPANSION,
-            viewport.size.height * VIEWPORT_EXPANSION));
-        let clip_rect = self.page_clip_rect.get();
-        if proposed_clip_rect == clip_rect {
-            return false;
-        }
-
-        let had_clip_rect = clip_rect != MAX_RECT;
-        if had_clip_rect && !should_move_clip_rect(clip_rect, viewport) {
-            return false;
-        }
-
-        self.page_clip_rect.set(proposed_clip_rect);
-
-        // If we didn't have a clip rect, the previous display doesn't need rebuilding
-        // because it was built for infinite clip (MAX_RECT).
-        had_clip_rect
-    }
-
-    pub fn set_devtools_wants_updates(&self, value: bool) {
-        self.devtools_wants_updates.set(value);
-    }
-
-    // https://html.spec.whatwg.org/multipage/#accessing-other-browsing-contexts
-    pub fn IndexedGetter(&self, _index: u32, _found: &mut bool) -> Option<Root<Window>> {
-        None
-    }
-
-    pub fn thaw(&self) {
-        self.timers.resume();
-
-        // Push the document title to the compositor since we are
-        // activating this document due to a navigation.
-        let document = self.Document();
-        document.r().title_changed();
-    }
-
-    pub fn freeze(&self) {
-        self.timers.suspend();
-    }
-
-    pub fn need_emit_timeline_marker(&self, timeline_type: TimelineMarkerType) -> bool {
-        let markers = self.devtools_markers.borrow();
-        markers.contains(&timeline_type)
-    }
-
-    pub fn emit_timeline_marker(&self, marker: TimelineMarker) {
-        let sender = self.devtools_marker_sender.borrow();
-        let sender = sender.as_ref().expect("There is no marker sender");
-        sender.send(marker).unwrap();
-    }
-
-    pub fn set_devtools_timeline_markers(&self,
-                                         markers: Vec<TimelineMarkerType>,
-                                         reply: IpcSender<TimelineMarker>) {
-        *self.devtools_marker_sender.borrow_mut() = Some(reply);
-        self.devtools_markers.borrow_mut().extend(markers.into_iter());
-    }
-
-    pub fn drop_devtools_timeline_markers(&self, markers: Vec<TimelineMarkerType>) {
-        let mut devtools_markers = self.devtools_markers.borrow_mut();
-        for marker in markers {
-            devtools_markers.remove(&marker);
-        }
-        if devtools_markers.is_empty() {
-            *self.devtools_marker_sender.borrow_mut() = None;
-        }
-    }
-
-    pub fn set_webdriver_script_chan(&self, chan: Option<IpcSender<WebDriverJSResult>>) {
-        *self.webdriver_script_chan.borrow_mut() = chan;
-    }
-
-    pub fn is_alive(&self) -> bool {
-        self.current_state.get() == WindowState::Alive
-    }
-
-    pub fn parent(&self) -> Option<Root<Window>> {
-        let browsing_context = self.browsing_context();
-        let browsing_context = browsing_context.as_ref().unwrap();
-
-        browsing_context.frame_element().map(|frame_element| {
-            let window = window_from_node(frame_element.r());
-            // FIXME(https://github.com/rust-lang/rust/issues/23338)
-            let r = window.r();
-            let context = r.browsing_context();
-            context.as_ref().unwrap().active_window()
-        })
     }
 }
 

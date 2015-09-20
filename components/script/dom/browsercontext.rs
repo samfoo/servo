@@ -8,9 +8,9 @@ use dom::bindings::js::{JS, Root};
 use dom::bindings::proxyhandler::{get_property_descriptor, fill_property_descriptor};
 use dom::bindings::utils::get_array_index_from_id;
 use dom::bindings::utils::{Reflectable, WindowProxyHandler};
-use dom::document::{Document, DocumentElement};
+use dom::document::DocumentElement;
 use dom::element::Element;
-use dom::window::Window;
+use dom::window::{Window, WindowElement};
 use js::glue::{GetProxyPrivate};
 use js::glue::{WrapperNew, CreateWrapperProxyHandler, ProxyTraps};
 use js::jsapi::{HandleObject, HandleId, MutableHandle, MutableHandleValue};
@@ -28,15 +28,15 @@ use std::ptr;
 #[privatize]
 #[allow(raw_pointer_derive)]
 #[must_root]
-pub struct BrowsingContext {
-    history: Vec<SessionHistoryEntry>,
+pub struct BrowsingContext<T: DocumentElement> {
+    history: Vec<SessionHistoryEntry<T>>,
     active_index: usize,
     window_proxy: Heap<*mut JSObject>,
     frame_element: Option<JS<Element>>,
 }
 
-impl BrowsingContext {
-    pub fn new(document: &Document, frame_element: Option<&Element>) -> BrowsingContext {
+impl<T: DocumentElement> BrowsingContext<T> {
+    pub fn new(document: &T, frame_element: Option<&Element>) -> BrowsingContext<T> {
         BrowsingContext {
             history: vec!(SessionHistoryEntry::new(document)),
             active_index: 0,
@@ -45,7 +45,7 @@ impl BrowsingContext {
         }
     }
 
-    pub fn active_document(&self) -> Root<Document> {
+    pub fn active_document(&self) -> Root<T> {
         self.history[self.active_index].document.root()
     }
 
@@ -86,13 +86,13 @@ impl BrowsingContext {
 #[must_root]
 #[privatize]
 #[derive(JSTraceable, HeapSizeOf)]
-pub struct SessionHistoryEntry {
-    document: JS<Document>,
-    children: Vec<BrowsingContext>
+pub struct SessionHistoryEntry<T: DocumentElement> {
+    document: JS<T>,
+    children: Vec<BrowsingContext<T>>
 }
 
-impl SessionHistoryEntry {
-    fn new(document: &Document) -> SessionHistoryEntry {
+impl<T: DocumentElement> SessionHistoryEntry<T> {
+    fn new(document: &T) -> SessionHistoryEntry<T> {
         SessionHistoryEntry {
             document: JS::from_ref(document),
             children: vec!()

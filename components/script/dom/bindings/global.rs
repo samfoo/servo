@@ -15,6 +15,7 @@ use dom::bindings::utils::{Reflectable, Reflector};
 use dom::window::{self, ScriptHelpers};
 use dom::workerglobalscope::WorkerGlobalScope;
 use dom::document::DocumentElement;
+use dom::window::WindowElement;
 use ipc_channel::ipc::IpcSender;
 use js::jsapi::{GetGlobalForObjectCrossCompartment};
 use js::jsapi::{JSContext, JSObject, JS_GetClass, MutableHandleValue};

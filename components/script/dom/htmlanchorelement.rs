@@ -15,6 +15,7 @@ use dom::bindings::codegen::InheritTypes::{HTMLAnchorElementDerived, HTMLImageEl
 use dom::bindings::codegen::InheritTypes::{MouseEventCast, NodeCast};
 use dom::bindings::js::{JS, MutNullableHeap, Root};
 use dom::document::{Document, DocumentElement};
+use dom::window::WindowElement;
 use dom::domtokenlist::DOMTokenList;
 use dom::element::{Element, ElementTypeId};
 use dom::event::Event;

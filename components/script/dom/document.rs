@@ -65,7 +65,7 @@ use dom::servohtmlparser::ServoHTMLParser;
 use dom::text::Text;
 use dom::treewalker::TreeWalker;
 use dom::uievent::UIEvent;
-use dom::window::{Window, ReflowReason};
+use dom::window::{Window, WindowElement, ReflowReason};
 use euclid::point::Point2D;
 use html5ever::tree_builder::{QuirksMode, NoQuirks, LimitedQuirks, Quirks};
 use ipc_channel::ipc::{self, IpcSender};
@@ -226,7 +226,7 @@ impl CollectionFilter for AppletsFilter {
     }
 }
 
-pub trait DocumentElement {
+pub trait DocumentElement: Reflectable {
     fn loader(&self) -> Ref<DocumentLoader>;
     fn mut_loader(&self) -> RefMut<DocumentLoader>;
     fn window(&self) -> Root<Window>;

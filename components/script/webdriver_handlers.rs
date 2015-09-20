@@ -14,6 +14,7 @@ use dom::bindings::js::Root;
 use dom::node::Node;
 use dom::document::DocumentElement;
 use dom::window::ScriptHelpers;
+use dom::window::WindowElement;
 use ipc_channel::ipc::IpcSender;
 use js::jsapi::JSContext;
 use js::jsapi::{RootedValue, HandleValue};

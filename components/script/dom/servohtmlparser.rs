@@ -18,6 +18,7 @@ use dom::document::{Document, DocumentElement};
 use dom::node::{window_from_node, Node};
 use dom::text::Text;
 use dom::window::Window;
+use dom::window::WindowElement;
 use encoding::all::UTF_8;
 use encoding::types::{Encoding, DecoderTrap};
 use html5ever::tokenizer;

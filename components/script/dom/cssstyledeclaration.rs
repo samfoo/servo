@@ -11,7 +11,7 @@ use dom::bindings::utils::{Reflector, reflect_dom_object};
 use dom::element::{StylePriority, Element};
 use dom::node::{window_from_node, document_from_node, NodeDamage};
 use dom::document::DocumentElement;
-use dom::window::Window;
+use dom::window::{Window, WindowElement};
 use selectors::parser::PseudoElement;
 use std::ascii::AsciiExt;
 use std::borrow::ToOwned;

@@ -17,6 +17,7 @@ use dom::bindings::trace::trace_object;
 use dom::browsercontext;
 use dom::eventtarget::EventTargetTypeId;
 use dom::window;
+use dom::window::WindowElement;
 use js;
 use js::glue::{CallJitMethodOp, CallJitGetterOp, CallJitSetterOp, IsWrapper};
 use js::glue::{RUST_FUNCTION_VALUE_TO_JITINFO, RUST_JSID_IS_INT};
