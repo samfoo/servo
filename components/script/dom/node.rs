@@ -77,27 +77,27 @@ use uuid;
 
 /// An HTML node.
 #[dom_struct]
-pub struct Node {
+pub struct Node<T: DocumentElement> {
     /// The JavaScript reflector for this node.
     eventtarget: EventTarget,
 
     /// The parent of this node.
-    parent_node: MutNullableHeap<JS<Node>>,
+    parent_node: MutNullableHeap<JS<Node<T>>>,
 
     /// The first child of this node.
-    first_child: MutNullableHeap<JS<Node>>,
+    first_child: MutNullableHeap<JS<Node<T>>>,
 
     /// The last child of this node.
-    last_child: MutNullableHeap<JS<Node>>,
+    last_child: MutNullableHeap<JS<Node<T>>>,
 
     /// The next sibling of this node.
-    next_sibling: MutNullableHeap<JS<Node>>,
+    next_sibling: MutNullableHeap<JS<Node<T>>>,
 
     /// The previous sibling of this node.
-    prev_sibling: MutNullableHeap<JS<Node>>,
+    prev_sibling: MutNullableHeap<JS<Node<T>>>,
 
     /// The document that this node belongs to.
-    owner_doc: MutNullableHeap<JS<Document>>,
+    owner_doc: MutNullableHeap<JS<T>>,
 
     /// The live list of children return by .childNodes.
     child_list: MutNullableHeap<JS<NodeList>>,
@@ -1372,7 +1372,7 @@ pub enum CloneChildrenFlag {
 
 fn as_uintptr<T>(t: &T) -> uintptr_t { t as *const T as uintptr_t }
 
-impl Node {
+impl<T: DocumentElement> Node<T> {
     pub fn reflect_node<N: Reflectable + NodeBase>
             (node:      Box<N>,
              document:  &Document,
@@ -1382,15 +1382,15 @@ impl Node {
         reflect_dom_object(node, GlobalRef::Window(window.r()), wrap_fn)
     }
 
-    pub fn new_inherited(type_id: NodeTypeId, doc: &Document) -> Node {
+    pub fn new_inherited(type_id: NodeTypeId, doc: &T) -> Node {
         Node::new_(type_id, Some(doc.clone()))
     }
 
     pub fn new_without_doc(type_id: NodeTypeId) -> Node {
-        Node::new_(type_id, None)
+        Node::new_(type_id, None as Option<&Document>)
     }
 
-    fn new_(type_id: NodeTypeId, doc: Option<&Document>) -> Node {
+    fn new_(type_id: NodeTypeId, doc: Option<&T>) -> Node {
         Node {
             eventtarget: EventTarget::new_inherited(),
 

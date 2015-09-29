@@ -28,6 +28,7 @@ use dom::bindings::trace::JSTraceable;
 use dom::bindings::trace::trace_reflector;
 use dom::bindings::utils::{Reflector, Reflectable};
 use dom::node::Node;
+use dom::document::DocumentElement;
 use js::jsapi::{JSObject, Heap, JSTracer};
 use js::jsval::JSVal;
 use layout_interface::TrustedNodeAddress;
@@ -141,11 +142,11 @@ impl <T> Clone for LayoutJS<T> {
     }
 }
 
-impl LayoutJS<Node> {
+impl<D: DocumentElement> LayoutJS<Node<D>> {
     /// Create a new JS-owned value wrapped from an address known to be a
     /// `Node` pointer.
     pub unsafe fn from_trusted_node_address(inner: TrustedNodeAddress)
-                                            -> LayoutJS<Node> {
+                                            -> LayoutJS<Node<D>> {
         let TrustedNodeAddress(addr) = inner;
         LayoutJS {
             ptr: NonZero::new(addr as *const Node)
